@@ -1,0 +1,42 @@
+﻿<Window x:Class="PrizeRoulette.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Prize Roulette" Height="800" Width="1024"
+        Background="#0f172a"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid>
+        <!-- Static Pointer (Top center) -->
+        <Polygon Points="0,0 30,0 15,40" Fill="#ef4444" 
+                 HorizontalAlignment="Center" VerticalAlignment="Top" 
+                 Margin="0,50,0,0" Panel.ZIndex="10"/>
+
+        <!-- Roulette Container -->
+        <!-- IsManipulationEnabled handles Touch. Mouse events handle the laptop fallback. -->
+        <Grid x:Name="RouletteContainer" Width="600" Height="600"
+              IsManipulationEnabled="True"
+              ManipulationStarting="OnManipulationStarting"
+              ManipulationCompleted="OnManipulationCompleted"
+              MouseLeftButtonDown="OnMouseLeftButtonDown"
+              MouseLeftButtonUp="OnMouseLeftButtonUp"
+              Background="Transparent">
+
+            <Grid.RenderTransform>
+                <!-- Hardware-accelerated transform -->
+                <RotateTransform x:Name="RouletteTransform" Angle="0" CenterX="300" CenterY="300"/>
+            </Grid.RenderTransform>
+
+            <!-- Base visual representation for testing -->
+            <Ellipse Fill="#1e293b" Stroke="#38bdf8" StrokeThickness="4" />
+            <Line X1="300" Y1="0" X2="300" Y2="600" Stroke="#38bdf8" StrokeThickness="2" />
+            <Line X1="0" Y1="300" X2="600" Y2="300" Stroke="#38bdf8" StrokeThickness="2" />
+
+            <TextBlock Text="PRIZE 1" Foreground="White" FontSize="24" HorizontalAlignment="Center" Margin="0,50,0,0"/>
+            <TextBlock Text="PRIZE 2" Foreground="White" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,50">
+                <TextBlock.LayoutTransform>
+                    <RotateTransform Angle="180"/>
+                </TextBlock.LayoutTransform>
+            </TextBlock>
+        </Grid>
+    </Grid>
+</Window>
