@@ -3,6 +3,11 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using Ruleta.Models;
+using Ruleta.Services;
+using System.Collections.Generic;
+using System.Windows.Controls;
+using System.Windows.Shapes;
 
 namespace PrizeRoulette
 {
@@ -21,10 +26,124 @@ namespace PrizeRoulette
         private double _mouseStartY = 0;
         private DateTime _mouseStartTime;
 
+        //Prize management
+        private PrizeCalculator _prizeCalculator;
+        private List<PrizeConfig> _currentPrizes;
+
         public MainWindow()
         {
             InitializeComponent();
+            _prizeCalculator = new PrizeCalculator();
+            LoadDynamicRouletteData();
         }
+
+        private void LoadDynamicRouletteData()
+        {
+            // Simulate extracting inventory based on a ticket tier
+            _currentPrizes = MockDatabaseDao.GetPrizesForCategory("SMALL"); //can changed by LARGE or SALL, its for testing 
+
+            // Assign mathematical geometry ranges to each prize
+            _currentPrizes = _prizeCalculator.CalculateSliceAngles(_currentPrizes);
+
+            // Render the UI
+            RenderDynamicRoulette(_currentPrizes);
+        }
+        // --------------------------------------------------------
+        // DYNAMIC RENDERING ENGINE
+        // --------------------------------------------------------
+
+        private void RenderDynamicRoulette(List<PrizeConfig> prizes)
+        {
+            RouletteCanvas.Children.Clear();
+            double radius = 300;
+            Point center = new Point(radius, radius);
+
+            // High contrast color palette for visibility
+            string[] hexColors = { "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316" };
+
+            for (int i = 0; i < prizes.Count; i++)
+            {
+                var prize = prizes[i];
+                string sliceColor = hexColors[i % hexColors.Length];
+
+                Path slicePath = CreateSlice(prize.StartAngle, prize.EndAngle, center, radius, sliceColor);
+                RouletteCanvas.Children.Add(slicePath);
+
+                UIElement textBlock = CreateSliceText(prize.ProductName, prize.StartAngle, prize.EndAngle, center, radius);
+                RouletteCanvas.Children.Add(textBlock);
+            }
+        }
+
+        private Point GetPointFromAngle(Point center, double radius, double angleInDegrees)
+        {
+            // Subtract 90 to align 0 degrees strictly to the vertical top pointer
+            double angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+            double x = center.X + radius * Math.Cos(angleInRadians);
+            double y = center.Y + radius * Math.Sin(angleInRadians);
+            return new Point(x, y);
+        }
+
+        private Path CreateSlice(double startAngle, double endAngle, Point center, double radius, string hexColor)
+        {
+            Point startPoint = GetPointFromAngle(center, radius, startAngle);
+            Point endPoint = GetPointFromAngle(center, radius, endAngle);
+            bool isLargeArc = (endAngle - startAngle) > 180.0;
+
+            PathFigure pathFigure = new PathFigure
+            {
+                StartPoint = center,
+                IsClosed = true
+            };
+
+            pathFigure.Segments.Add(new LineSegment(startPoint, false));
+            pathFigure.Segments.Add(new ArcSegment
+            {
+                Point = endPoint,
+                Size = new Size(radius, radius),
+                IsLargeArc = isLargeArc,
+                SweepDirection = SweepDirection.Clockwise
+            });
+
+            PathGeometry pathGeometry = new PathGeometry();
+            pathGeometry.Figures.Add(pathFigure);
+
+            return new Path
+            {
+                Data = pathGeometry,
+                Fill = (SolidColorBrush)new BrushConverter().ConvertFrom(hexColor),
+                Stroke = Brushes.White,
+                StrokeThickness = 2
+            };
+        }
+
+        private UIElement CreateSliceText(string text, double startAngle, double endAngle, Point center, double radius)
+        {
+            double middleAngle = startAngle + ((endAngle - startAngle) / 2);
+
+            TextBlock textBlock = new TextBlock
+            {
+                Text = text,
+                Foreground = Brushes.White,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                TextAlignment = TextAlignment.Center,
+                Width = 180 // Constrain width for centering
+            };
+
+            TransformGroup transformGroup = new TransformGroup();
+            // Center the text block horizontally and push it radially outward by 75%
+            transformGroup.Children.Add(new TranslateTransform(-90, -(radius * 0.75)));
+            transformGroup.Children.Add(new RotateTransform(middleAngle));
+
+            Canvas.SetLeft(textBlock, center.X);
+            Canvas.SetTop(textBlock, center.Y);
+
+            textBlock.RenderTransform = transformGroup;
+
+            return textBlock;
+        }
+
+
 
         // --------------------------------------------------------
         // TOUCH API IMPLEMENTATION
@@ -106,13 +225,21 @@ namespace PrizeRoulette
         {
             _isSpinning = true;
 
-            double velocityMultiplier = Math.Abs(velocity * 15);
-            double targetAngle = _currentAngle + (360 * 5) + velocityMultiplier;
+            // 1. Business Logic resolves the winner before the UI spins
+            PrizeResult result = _prizeCalculator.DetermineWinningPrize(_currentPrizes);
+
+            // 2. Calculate the UI offset needed to align the winning slice to the top pointer
+            // The top pointer is at 0 degrees. If the target angle is 90, the wheel must rotate backward by 90 (or forward to 360-90)
+            double requiredRotation = 360 - result.TargetAngle;
+
+            // 3. Add multiple full baseline rotations (5) based on user's input inertia for a realistic feel
+            double baseSpins = 360 * 5;
+            double targetVisualAngle = _currentAngle + baseSpins + requiredRotation - (_currentAngle % 360);
 
             var spinAnimation = new DoubleAnimation
             {
                 From = _currentAngle,
-                To = targetAngle,
+                To = targetVisualAngle,
                 Duration = TimeSpan.FromSeconds(4.5),
                 FillBehavior = FillBehavior.HoldEnd,
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
@@ -120,14 +247,14 @@ namespace PrizeRoulette
 
             spinAnimation.Completed += (s, e) =>
             {
-                // Normalize angle
-                _currentAngle = targetAngle % 360;
-
-                // Release the animation lock so properties can be modified again
+                _currentAngle = targetVisualAngle % 360;
                 RouletteTransform.BeginAnimation(RotateTransform.AngleProperty, null);
                 RouletteTransform.Angle = _currentAngle;
 
                 _isSpinning = false;
+
+                // Execute strictly after animation finishes
+                MessageBox.Show($"Tu premio es: {result.WinningPrize.ProductName}", "Premio");
             };
 
             RouletteTransform.BeginAnimation(RotateTransform.AngleProperty, spinAnimation);

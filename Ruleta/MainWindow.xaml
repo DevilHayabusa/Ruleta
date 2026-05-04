@@ -26,17 +26,8 @@
                 <RotateTransform x:Name="RouletteTransform" Angle="0" CenterX="300" CenterY="300"/>
             </Grid.RenderTransform>
 
-            <!-- Base visual representation for testing -->
-            <Ellipse Fill="#1e293b" Stroke="#38bdf8" StrokeThickness="4" />
-            <Line X1="300" Y1="0" X2="300" Y2="600" Stroke="#38bdf8" StrokeThickness="2" />
-            <Line X1="0" Y1="300" X2="600" Y2="300" Stroke="#38bdf8" StrokeThickness="2" />
-
-            <TextBlock Text="PRIZE 1" Foreground="White" FontSize="24" HorizontalAlignment="Center" Margin="0,50,0,0"/>
-            <TextBlock Text="PRIZE 2" Foreground="White" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,50">
-                <TextBlock.LayoutTransform>
-                    <RotateTransform Angle="180"/>
-                </TextBlock.LayoutTransform>
-            </TextBlock>
+            <!-- Dynamic Rendering Surface where C# will draw the pie slices -->
+            <Canvas x:Name="RouletteCanvas" Width="600" Height="600" />
         </Grid>
     </Grid>
 </Window>
